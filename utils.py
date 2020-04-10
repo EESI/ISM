@@ -1,6 +1,21 @@
+import numpy as np
 import pandas as pd
 from collections import Counter
 from math import log2
+import matplotlib.colors as mcolors
+import numpy as np
+import matplotlib
+import matplotlib.pyplot as plt
+font = {# 'family' : 'serif', # Times (source: https://matplotlib.org/tutorials/introductory/customizing.html)
+        'family': 'sans-serif', # Helvetica
+#         'family': 'monospace',
+#         'weight' : 'bold',
+        'size'   : 12}
+matplotlib.rc('font', **font) 
+text = {'usetex': False}
+matplotlib.rc('text', **text)
+monospace_font = {'fontname':'monospace'}
+CSS4_COLORS = mcolors.CSS4_COLORS
 
 def read_fasta(filename):
     seq_list = []
@@ -54,3 +69,74 @@ def preprocessing(seq_df, meta_df):
     data_df = data_df.rename(columns={'region': 'continent', 'region_exposure': 'continent_exposure'})
     data_df = data_df.drop(['virus', 'strain', 'genbank_accession', 'country', 'title', 'country_exposure'], axis = 1)
     return data_df
+
+def get_color_names(CSS4_COLORS, num_colors):
+    # bad_colors = set(['seashell', 'linen', 'ivory', 'oldlace',
+    #                   'floralwhite', 'lightyellow', 'lightgoldenrodyellow', 'honeydew', 'mintcream', 'azure', 'lightcyan',
+    #                   'aliceblue', 'ghostwhite', 'lavenderblush'
+    #                  ])
+    bad_colors = set([])
+    by_hsv = sorted((tuple(mcolors.rgb_to_hsv(mcolors.to_rgb(color))),
+                             name)
+                            for name, color in CSS4_COLORS.items())
+    names = [name for hsv, name in by_hsv][14:]
+    prime_names = ['red', 'orange', 'green', 'blue', 'gold', 
+                 'lightskyblue', 'brown', 'black', 'pink',
+                 'yellow']
+    OTHER = 'gray'
+    name_list = [name for name in names if name not in prime_names and name != OTHER and name not in bad_colors]   
+    if num_colors > len(name_list) - 10:
+        print('No enough distinctive colors!!!')
+        name_list = name_list + name_list
+    if num_colors > len(prime_names):
+        ind_list = np.linspace(0, len(name_list), num_colors - 10, dtype = int, endpoint=False).tolist()
+        color_names = prime_names + [name_list[ind] for ind in ind_list]
+    else:
+        color_names = prime_names[:num_colors]
+    return color_names
+
+def global_color_map(COLOR_DICT, ISM_list):   
+    # adapted from https://matplotlib.org/3.1.0/gallery/color/named_colors.html
+    ncols = 2
+    n = len(COLOR_DICT)
+    nrows = n // ncols + int(n % ncols > 0)
+
+    cell_width = 1200
+    cell_height = 100
+    swatch_width = 180
+    margin = 24
+    topmargin = 40
+
+    width = cell_width * 3 + 2 * margin
+    height = cell_height * nrows + margin + topmargin
+    dpi = 300
+
+    fig, ax = plt.subplots(figsize=(width / dpi, height / dpi), dpi=dpi)
+    fig.subplots_adjust(margin/width, margin/height,
+                        (width-margin)/width, (height-topmargin)/height)
+
+    ax.set_xlim(0, cell_width * 4)
+    ax.set_ylim(cell_height * (nrows-0.5), -cell_height/2.)
+    ax.yaxis.set_visible(False)
+    ax.xaxis.set_visible(False)
+    ax.set_axis_off()
+    # ax.set_title(title, fontsize=24, loc="left", pad=10)
+    ISM_list.append('OTHER')
+    for i, name in enumerate(ISM_list):
+        row = i % nrows
+        col = i // nrows
+        y = row * cell_height
+
+        swatch_start_x = cell_width * col
+        swatch_end_x = cell_width * col + swatch_width
+        text_pos_x = cell_width * col + swatch_width + 50
+
+        ax.text(text_pos_x, y, name, fontsize=14,
+                fontname='monospace',
+                horizontalalignment='left',
+                verticalalignment='center')
+
+        ax.hlines(y, swatch_start_x, swatch_end_x,
+                  color=COLOR_DICT[name], linewidth=18)
+    plt.savefig('figures/add_color_map.pdf', bbox_inches='tight', dpi=dpi)
+    plt.show()

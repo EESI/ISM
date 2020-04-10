@@ -71,6 +71,8 @@ def ISM_filter(dict_freq, threshold):
             res_dict['OTHER'] = [0, res_dict['OTHER'][1] + dict_freq[ISM][1]]
         else:
             res_dict[ISM] = [dict_freq[ISM][0], dict_freq[ISM][1] + res_dict.get(ISM, [0, 0])[1]]
+    if res_dict['OTHER'][1] == 0:
+        del res_dict['OTHER']
     return res_dict
 def statewise_analysis(df, state):
     df_tmp = df[df['division'] == state]
