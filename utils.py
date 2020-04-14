@@ -95,7 +95,7 @@ def get_color_names(CSS4_COLORS, num_colors):
         color_names = prime_names[:num_colors]
     return color_names
 
-def global_color_map(COLOR_DICT, ISM_list):   
+def global_color_map(COLOR_DICT, ISM_list, out_dir='figures'):   
     # adapted from https://matplotlib.org/3.1.0/gallery/color/named_colors.html
     ncols = 2
     n = len(COLOR_DICT)
@@ -138,7 +138,7 @@ def global_color_map(COLOR_DICT, ISM_list):
 
         ax.hlines(y, swatch_start_x, swatch_end_x,
                   color=COLOR_DICT[name], linewidth=18)
-    plt.savefig('figures/add_color_map.pdf', bbox_inches='tight', dpi=dpi)
+    plt.savefig('{}/add_color_map.pdf'.format(out_dir), bbox_inches='tight', dpi=dpi)
     plt.show()
 # ambiguous bases correction
 def is_same(error, target, mask, ISM_LEN, ambiguous_base):
