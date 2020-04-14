@@ -140,3 +140,89 @@ def global_color_map(COLOR_DICT, ISM_list):
                   color=COLOR_DICT[name], linewidth=18)
     plt.savefig('figures/add_color_map.pdf', bbox_inches='tight', dpi=dpi)
     plt.show()
+# ambiguous bases correction
+def is_same(error, target, mask, ISM_LEN, ambiguous_base):
+    match = np.array(list(target)) == np.array(list(error))
+    res = np.logical_or(mask, match).sum() == ISM_LEN
+    return res
+
+def error_correction(error, ambiguous_base, base_to_ambiguous, ISM_list, ISM_LEN, THRESHOLD = 0.9):
+    mask = [True if base in ambiguous_base else False for base in error]
+    support_ISM = []
+    for target_ISM in ISM_list:
+        if is_same(error, target_ISM, mask, ISM_LEN, ambiguous_base):
+            support_ISM.append(target_ISM)
+    partial_correction = list(error)
+    FLAG = True
+    for position_idx in list(np.where(mask)[0]):
+        possible_bases = set([candid_ISM[position_idx] for candid_ISM in support_ISM])
+        possible_bases.discard('N')
+        possible_bases.discard(error[position_idx])
+        possible_bases.discard('-')
+        non_ambiguous_set = set([])
+        ambiguous_set = set([])
+        for base in possible_bases:
+            if base not in ambiguous_base:
+                non_ambiguous_set.add(base)
+            else:
+                ambiguous_set.add(base)
+        if len(ambiguous_set) == 0:
+            if len(non_ambiguous_set) == 0:
+                continue
+            bases = ''.join(sorted(non_ambiguous_set))
+            if len(bases) == 1:
+                num_support = len([candid_ISM[position_idx] for candid_ISM in support_ISM if candid_ISM[position_idx] == bases])
+                non_support = set([candid_ISM[position_idx] for candid_ISM in support_ISM if candid_ISM[position_idx] != bases])
+                if num_support/len(support_ISM) > THRESHOLD and bases in ambiguous_base[error[position_idx]]:
+                    partial_correction[position_idx] = bases
+                else:
+                    FLAG = False
+                    print('LOG: one_base_correction failed because no enough support: {}/{}: {}->{}'.format(num_support, len(support_ISM), non_support, bases))
+            elif bases in base_to_ambiguous:
+                FLAG = False
+                partial_correction[position_idx] = base_to_ambiguous[bases]
+            else:
+                FLAG = False
+                print("LOG: can't find: {}".format(bases))
+        else:
+            bases_from_ambiguous_set = set([])
+            ambiguous_bases_intersection = ambiguous_base[error[position_idx]].copy()  
+            for base in ambiguous_set:
+                bases_from_ambiguous_set = bases_from_ambiguous_set.union(ambiguous_base[base])
+                ambiguous_bases_intersection = ambiguous_bases_intersection.intersection(ambiguous_base[base])
+            
+            if bases_from_ambiguous_set.issubset(ambiguous_base[error[position_idx]]) is False:
+                print("LOG: new bases {} are not good as {}".format(bases_from_ambiguous_set, ambiguous_base[error[position_idx]]))
+                bases_from_ambiguous_set = ambiguous_base[error[position_idx]]
+                
+            bases_from_ambiguous_set = ''.join(sorted(bases_from_ambiguous_set))
+            
+            bases = ''.join(sorted(non_ambiguous_set))
+            
+            if len(bases) == 0:
+                bases = bases_from_ambiguous_set
+            if len(bases) == 1 and bases in bases_from_ambiguous_set:
+                num_support = len([candid_ISM[position_idx] for candid_ISM in support_ISM if candid_ISM[position_idx] == bases])
+                non_support = set([candid_ISM[position_idx] for candid_ISM in support_ISM if candid_ISM[position_idx] != bases])
+                if num_support/len(support_ISM) > THRESHOLD and bases in ambiguous_bases_intersection:
+                    partial_correction[position_idx] = bases
+                else:
+                    if bases not in ambiguous_bases_intersection:
+                        print('LOG: conflicts dected between proposed correct and all supporting ISMs')
+                        bases = ''.join(ambiguous_bases_intersection.add(base))
+                        if bases in base_to_ambiguous and set(bases).issubset(ambiguous_base[error[position_idx]]):
+                            FLAG = False
+                            partial_correction[position_idx] = base_to_ambiguous[bases]
+                    else:
+                        FLAG = False
+                        print('LOG: one_base_correction failed because no enough support: {}/{}: {}->{}'.format(num_support, len(support_ISM), non_support, bases))
+            else:
+                bases = ''.join(sorted(set(bases_from_ambiguous_set + bases)))
+                if bases in base_to_ambiguous and set(bases).issubset(ambiguous_base[error[position_idx]]):
+                    FLAG = False
+                    partial_correction[position_idx] = base_to_ambiguous[bases]
+                else:
+                    FLAG = False
+                    print("LOG: new bases {} are not good as {}".format(bases, ambiguous_base[error[position_idx]]))
+            
+    return FLAG, ''.join(partial_correction)
