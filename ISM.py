@@ -29,7 +29,7 @@ from Bio.SeqFeature import SeqFeature, FeatureLocation
 from Bio import SeqIO
 
 # get all sequence records for the specified genbank file
-def annotate_ISM_positions(mapped_reference_index, reference_genbank_name="data/covid-19-genbank.gb"):
+def annotate_ISM_positions(mapped_reference_index, reference_genbank_name="data/covid-19-genbank.gb", output_dir='figures'):
     recs = [rec for rec in SeqIO.parse(reference_genbank_name, "genbank")]
 
     gene_dict = {}
@@ -40,18 +40,19 @@ def annotate_ISM_positions(mapped_reference_index, reference_genbank_name="data/
             content = '{}: {}'.format(feat.qualifiers['protein_id'][0], feat.qualifiers['product'][0])
             gene_dict[key] = content
 
-    with open('figures/ISM_gene_in_reference.csv', 'w+') as fw:
-        output = '{},{},{}, {}\n'.format('Reference position', 'Entropy', 'Gene1', 'Gene2')
-        # print(output)
-        fw.write(output)
+    with open('{}/ISM_gene_in_reference.csv'.format(output_dir), 'w+') as fw:
+        output = '{:^20} | {:^10} | {:^70}'.format('Reference position', 'Entropy', 'Gene')
+        print(output)
+        print('-'*20 + '   ' + '-'*10 + '   ' + '-'* 70)
+        fw.write(output + '\n')
         for index, entropy in mapped_reference_index:
             result = []
             for key in gene_dict:
                 if index >= key[0] and index <= key[1]:
                     result.append(gene_dict[key])
-            output = '{},{},{}\n'.format(index,entropy,','.join(result))
-            # print(output)
-            fw.write(output) 
+            output = '{:>20} | {:.8f} | {:<70}'.format(index, entropy, ', '.join(result))
+            print(output + '\n')
+            fw.write(output + '\n') 
             
 def regional_analysis(df, region):
     df_tmp = df[df['country/region'] == region]

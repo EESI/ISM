@@ -192,7 +192,7 @@ def error_correction(error, ambiguous_base, base_to_ambiguous, ISM_list, ISM_LEN
                 ambiguous_bases_intersection = ambiguous_bases_intersection.intersection(ambiguous_base[base])
             
             if bases_from_ambiguous_set.issubset(ambiguous_base[error[position_idx]]) is False:
-                print("LOG: new bases {} are not good as {}".format(bases_from_ambiguous_set, ambiguous_base[error[position_idx]]))
+                print("LOG: new bases {} conflict with or are not as good as original bases {}".format(bases_from_ambiguous_set, ambiguous_base[error[position_idx]]))
                 bases_from_ambiguous_set = ambiguous_base[error[position_idx]]
                 
             bases_from_ambiguous_set = ''.join(sorted(bases_from_ambiguous_set))
@@ -223,6 +223,6 @@ def error_correction(error, ambiguous_base, base_to_ambiguous, ISM_list, ISM_LEN
                     partial_correction[position_idx] = base_to_ambiguous[bases]
                 else:
                     FLAG = False
-                    print("LOG: new bases {} are not good as {}".format(bases, ambiguous_base[error[position_idx]]))
+                    print("LOG: new bases {} conflict with or are not as good as original bases {}".format(bases, ambiguous_base[error[position_idx]]))
             
     return FLAG, ''.join(partial_correction)
