@@ -48,7 +48,7 @@ def annotate_ISM_positions(mapped_reference_index, reference_genbank_name="data/
         for index, entropy in mapped_reference_index:
             result = []
             for key in gene_dict:
-                if index >= key[0] and index <= key[1]:
+                if index > key[0] and index <= key[1]:
                     result.append(gene_dict[key])
             output = '{:>20} | {:.8f} | {:<70}'.format(index, entropy, ', '.join(result))
             print(output + '\n')
