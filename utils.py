@@ -31,6 +31,25 @@ def read_fasta(filename):
                     seq = ''
                     header = line[1:].strip('\n')
             else:
+                seq += line.strip('\n').replace(' ', '').replace('-', 'N')
+        if len(seq) > 0:
+            seq_list.append((header, seq.upper()))
+    return seq_list
+
+def read_alignment(filename):
+    seq_list = []
+    seq = ''
+    with open(filename) as f:
+        for line in f:
+            if line[0] == '>':
+                if len(seq) > 0:
+                    seq_list.append((header, seq.upper()))
+                    seq = ''
+                    header = line[1:].strip('\n')
+                else:
+                    seq = ''
+                    header = line[1:].strip('\n')
+            else:
                 seq += line.strip('\n')
         if len(seq) > 0:
             seq_list.append((header, seq.upper()))
@@ -43,7 +62,7 @@ def write_fasta(filename, seq_dict):
             f.write('{}\n'.format(seq_dict[header]))
 
 def load_data(gisaid_filename = '../mafft_20200405.output'):
-    seq_list = read_fasta(gisaid_filename)
+    seq_list = read_alignment(gisaid_filename)
     seq_dict = {'gisaid_epi_isl': [], 'sequence': []}
     for header, seq in seq_list:
         header = header.split('|')[1]
@@ -55,6 +74,34 @@ def load_data(gisaid_filename = '../mafft_20200405.output'):
 
     seq_df = pd.DataFrame.from_dict(seq_dict)
     return seq_df, REFERENCE
+
+def load_data_nextstrain(gisaid_filename = '../mafft_20200405.output'):
+    seq_list = read_alignment(gisaid_filename)
+    seq_dict = {'strain': [], 'sequence': []}
+    for header, seq in seq_list:
+        header = header.strip('\n')
+        if len(header.split('|')) >= 2 and header.split('|')[1] == 'NC_045512.2':
+            REFERENCE = ('NC_045512.2', seq)
+            continue
+        seq_dict['strain'].append(header)
+        seq_dict['sequence'].append(seq)
+
+    seq_df = pd.DataFrame.from_dict(seq_dict)
+    return seq_df, REFERENCE
+
+def preprocessing_nextstrain(seq_df, meta_df):
+    # join sequence with metadate
+    data_df = seq_df.join(meta_df.set_index(['strain']), on = ['strain'],how = 'left')
+    # filter by Human, valid date time and convert date column to 'datetime' dtype
+    data_df = data_df[data_df.apply(lambda x: (x['host'] == 'Human') and ('X' not in x['date']) and len(x['date'].split('-')) == 3, axis=1)]
+    data_df = data_df[data_df.apply(lambda x: (x['host'] == 'Human') and ('X' not in x['date']) and len(x['date'].split('-')) == 3, axis=1)]
+    data_df['country/region'] = data_df.apply(lambda x: 'Mainland China' if x['country'] == 'China' else x['country'], axis=1)
+    data_df['country/region_exposure'] = data_df.apply(lambda x: 'Mainland China' if x['country_exposure'] == 'China' else x['country_exposure'], axis=1)
+
+    data_df['date'] = pd.to_datetime(data_df['date'])
+    data_df = data_df.rename(columns={'region': 'continent', 'region_exposure': 'continent_exposure'})
+    data_df = data_df.drop(['virus', 'strain', 'genbank_accession', 'country', 'title', 'country_exposure'], axis = 1)
+    return data_df
 
 def preprocessing(seq_df, meta_df):
     # join sequence with metadate
@@ -226,3 +273,130 @@ def error_correction(error, ambiguous_base, base_to_ambiguous, ISM_list, ISM_LEN
                     print("LOG: new bases {} conflict with or are not as good as original bases {}".format(bases, ambiguous_base[error[position_idx]]))
             
     return FLAG, ''.join(partial_correction)
+
+def get_weblogo(seq_list, position):
+    return Counter([seq_list[i][position] for i in range(len(seq_list))])
+
+import matplotlib as mpl
+from matplotlib.text import TextPath
+from matplotlib.patches import PathPatch
+from matplotlib.font_manager import FontProperties
+
+fp = FontProperties(family="monospace", weight="bold") 
+globscale = 1.35
+LETTERS = { "T" : TextPath((-0.305, 0), "T", size=1, prop=fp),
+            "G" : TextPath((-0.384, 0), "G", size=1, prop=fp),
+            "A" : TextPath((-0.35, 0), "A", size=1, prop=fp),
+            "C" : TextPath((-0.366, 0), "C", size=1, prop=fp),
+            "U" : TextPath((-0.366, 0), "U", size=1, prop=fp),
+          }
+# LETTERS = { "T" : TextPath((0, 0), "T", size=1, prop=fp),
+#             "G" : TextPath((0, 0), "G", size=1, prop=fp),
+#             "A" : TextPath((0, 0), "A", size=1, prop=fp),
+#             "C" : TextPath((0, 0), "C", size=1, prop=fp),
+#             "U" : TextPath((0, 0), "U", size=1, prop=fp),
+#           }
+
+COLOR_SCHEME = {'G': 'orange', 
+                'A': 'red', 
+                'C': 'blue', 
+                'T': 'darkgreen',
+                'U': 'black'
+               }
+
+def letterAt(letter, x, y, yscale=1, ax=None):
+    text = LETTERS[letter]
+
+    t = mpl.transforms.Affine2D().scale(1*globscale, yscale*globscale) + \
+        mpl.transforms.Affine2D().translate(x,y) + ax.transData
+    p = PathPatch( text, lw=0, fc=COLOR_SCHEME[letter],  transform=t)
+    if ax != None:
+        ax.add_artist(p)
+    return p
+
+def get_nt_scores(weblogo):
+    scores = []
+    for i in range(weblogo.shape[1]):
+        tmp = [('A', weblogo[0, i]), ('C', weblogo[1, i]), ('G', weblogo[2, i]), ('T', weblogo[3, i])]
+        tmp.sort(key= lambda x: x[1])
+        scores.append(tmp)
+    return scores
+
+def get_att_box(att):
+    box = []
+    for i in range(att.shape[0]):
+        if att[i,0] > 0:
+            if len(box) == 0:
+                if i - 4 >= 0:
+                    box.append([i-4, i+4])
+                else:
+                    box.append([0, i+4])
+                if i + 4 >= att.shape[0]:
+                    box[-1][-1] = att.shape[0]
+                    break
+            else:
+                if i - 4 <= box[-1][-1]:
+                    if i + 4 >= att.shape[0]:
+                        box[-1][-1] = att.shape[0]
+                        break
+                    else:
+                        box[-1][-1] = i + 4
+                else:
+                    if i - 4 >= 0:
+                        box.append([i-4, i+4])
+                    else:
+                        box.append([0, i+4])
+                    if i + 4 >= att.shape[0]:
+                        box[-1][-1] = att.shape[0]
+                        break
+    return box
+
+import matplotlib.patches as patches
+def plot(ax, tmp_logo, tmp_att):
+    ALL_SCORES2 = get_nt_scores(tmp_logo)
+    boxes = get_att_box(tmp_att)
+    all_scores = ALL_SCORES2
+    x = 1
+    maxi = 0
+    for scores in all_scores:
+        y = 0
+        for base, score in scores:
+            letterAt(base, x, y, score, ax)
+            y += score
+        x += 1
+        maxi = max(maxi, y)
+    maxi += maxi * 0.05
+    ax.set_xticklabels([i for i in range(tmp_logo.shape[1])], rotation = 90, fontsize = 14)
+    for box in boxes:
+        rect = patches.Rectangle((box[0] + 1 - 0.5,0),box[1] - box[0],maxi,linewidth=2,edgecolor='r',facecolor='none')
+        ax.add_patch(rect)
+
+    maxi += maxi * 0.05
+    ax.get_yaxis().set_visible(True)
+    ax.set_xticks(range(1,x))
+    ax.set_xlim((0, x)) 
+    ax.set_ylim((0, maxi))      
+    plt.show()
+    
+def plot_scale(ax, tmp_logo, xlabel, ylabel):
+    ALL_SCORES2 = get_nt_scores(tmp_logo)
+    all_scores = ALL_SCORES2
+    x = 1
+    maxi = 0
+    for scores in all_scores:
+        y = 0
+        for base, score in scores:
+            letterAt(base, x, y, score, ax)
+            y += score
+        x += 1
+        maxi = max(maxi, y)
+    maxi += maxi * 0.05
+    ax.set_xticklabels([i + 1 for i in range(tmp_logo.shape[1])], rotation = 90)
+    ax.tick_params(labelsize = 25)
+    ax.get_yaxis().set_visible(True)
+    ax.set_xticks(range(1,x))
+    ax.set_xlim((0, x)) 
+    ax.set_ylim((0, maxi))  
+    ax.set_ylabel(ylabel, fontsize = 30) 
+    if xlabel:
+        ax.set_xlabel(xlabel, fontsize = 30) 
