@@ -88,7 +88,7 @@ REFERENCE_ISM = ''.join([REFERENCE[1][idx] for idx in position_list])
 print('Reference ISM: {}'.format(REFERENCE_ISM))
 
 
-def annotate_ISM_positions(mapped_reference_index, reference_genbank_name="data/covid-19-genbank.gb", output_dir='figures'):
+def annotate_ISM_positions(mapped_reference_index, reference_genbank_name=REF_DATA, output_dir='figures'):
     recs = [rec for rec in SeqIO.parse(reference_genbank_name, "genbank")]
 
     gene_dict = {}

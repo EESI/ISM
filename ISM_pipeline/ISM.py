@@ -97,8 +97,8 @@ def regional_typical_ISM_bar(ISM, region_list, region_raw_count):
 
 def time_subset(ISM_df, start, end):
     # start: exclusive, end: inclusive
-    filter_date_1 = datetime.datetime.strptime(start, '%Y-%m-%d').date()
-    filter_date_2 = datetime.datetime.strptime(end, '%Y-%m-%d').date()
+    filter_date_1 = pd.to_datetime(start, format='%Y-%m-%d')
+    filter_date_2 = pd.to_datetime(end, format='%Y-%m-%d')
     return ISM_df[(filter_date_1 < ISM_df['date']) & (ISM_df['date'] <= filter_date_2)]
 
 def frequency_count(df):
